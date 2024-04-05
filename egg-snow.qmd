@@ -1,5 +1,5 @@
 ---
-title: "egg-snow"
+title: "Data Analaysis with the Arctic shorebird csv files"
 format: html
 ---
 
@@ -24,39 +24,25 @@ nests_csv <- "ASDN_Bird_nests.csv"
 
 eggs_csv <- "ASDN_Bird_eggs.csv"
 
-lemmings_csv <- "ASDN_Daily_pred_lemm.csv"
-
 species_csv <- "species.csv"
 
+lemmings_csv <- "ASDN_Daily_pred_lemm.csv"
 ```
 
-## Import data
 
-```{r}
+## Question 1: Does the snow amount & timing impact the number of eggs? Is it species dependant?
 
-sites_data <- read_csv(file.path(path_raw, sites_csv))
-
-
-
-
-eggs_data <- read_csv(file.path(path_raw, eggs_csv))
-
-lemmings_data <- read_csv(file.path(path_raw, lemmings_csv))
-
-species_data <- read_csv(file.path(path_raw, species_csv))
-
-```
-
-## Summarize the nests table
+### Summarize the nests table
 
 Read the nest data in
 
 ```{r}
 nests_data <- read_csv(file.path(path_raw, nests_csv))
+
 glimpse(nests_data)
 ```
 
-Yeah! `Date_found` is already in date format!
+Yeah! `Date_found` is already in date format! We can thus directly aggregate the data by months:
 
 
 ```{r}
@@ -66,16 +52,17 @@ nests_month <- nests_data %>%
   summarize(n_nest = n())
 ```
 
-## Summarize the snow cover table
+### Summarize the snow cover table
 
 Read the snow cover data in
 
 ```{r}
 snowcover_data <- read_csv(file.path(path_raw, snowcover_csv))
+
+glimpse(snowcover_data)
 ```
 
-
-First we need to transform the date in date format and compute the monthly aggregate
+The Date is stored as a character we thus first we need to transform the date in date format before computing the monthly aggregate:
 
 ```{r}
 snowcover_data_fixed <- snowcover_data %>%
@@ -83,7 +70,7 @@ snowcover_data_fixed <- snowcover_data %>%
          Date2 = as_date(Date))
 ```
 
-We have 72 errors. Let's have a look at the date which failed
+We have 72 errors. Let's have a look at the date which failed:
 
 ```{r}
 snowcover_data_fixed %>% 
@@ -92,7 +79,7 @@ snowcover_data_fixed %>%
 ```
 
 
-It is because 2 days were entered `8&9 june 06`, but we know if was in June, so let's add this
+It is because 2 days were entered as one value `8&9 june 06`, it is not in the expected format
 
 ```{r}
 snowcover_data_fixed <- snowcover_data_fixed %>%
@@ -110,7 +97,13 @@ snowcover_data_fixed <- snowcover_data %>%
 ```
 
 
-Now lets compute the monthly statistics
+::: {.callout-note}
+## Fun fact
+You might be wondering why I started with `as_date()` instead of directly using `dmy()`. Well turns out that while preparing this exercise I discovered a bug in this `lubridate` function!! See <https://github.com/tidyverse/lubridate/issues/1161>
+:::
+
+
+Now let's compute the monthly statistics
 
 ```{r}
 # adding the snow days with a threshold at 10%
@@ -124,13 +117,13 @@ snowcover_month <- snowcover_data_fixed %>%
 ```
 
  
-## Join the two
+### Join the snow cover and nest tables
 
 ```{r}
 nests_snow_month <- nests_month %>%
   inner_join(snowcover_month, join_by(Site, Year, Month))
 
-names(nests_snow)
+names(nests_snow_month)
 ```
 
 Well in the end we did not have much information by months (mainly 2 months per year focused on June and July), so let's aggregate by year instead:
@@ -141,9 +134,11 @@ nests_snow_year <- nests_snow_month %>%
   summarise(cum_snow_days = sum(cum_snow_days, na.rm=TRUE),
             avg_snow_cover = mean(avg_snow_cover, na.rm=TRUE),
             n_nest = sum(n_nest, na.rm=TRUE)
-            )
+            ) %>%
+  ungroup()
 ```
 
+### Plots
 
 ```{r}
 ggplot(nests_snow_year, aes(x=cum_snow_days, y=n_nest , color=Species)) + 
@@ -161,30 +156,23 @@ ggplot(nests_snow_year, aes(x=avg_snow_cover, y=n_nest , color=Species)) +
   # facet_wrap(vars(Year), scales = "free")
 ```
 
+What do you think is the answer to our question? 
+
+
+## Question 2: Which shorebird species makes the most eggs?
+
+### Import the data
 
 ```{r}
-lemming_sum <- lemmings_data %>%
-  group_by(Site, Year, Species) %>%
-  summarize(n_lemmings = n())
-```
+sites_data <- read_csv(file.path(path_raw, sites_csv))
 
-try by species of bird vs lemming
+eggs_data <- read_csv(file.path(path_raw, eggs_csv))
 
-```{r}
-nest_lemm <- nests_sum %>%
-  inner_join(lemming_sum, join_by(Site, Year))
-
-names(nest_lemm)
+species_data <- read_csv(file.path(path_raw, species_csv))
 ```
 
 
-
-```{r}
-ggplot(nest_lemm, aes(x=n_lemmings, y=n_nest , color=Species.x)) + 
-  geom_point()
-```
-
-## Which species makes the most eggs
+Let's compute the number of eggs per nest. The column `Egg-num` seems to be a good candidate to estimate the number of eggs per nest:
 
 ```{r}
 eggs_sum <- eggs_data %>%
