@@ -6,6 +6,7 @@ format: html
 
 ```{r, message=FALSE}
 library(tidyverse)
+library(lubridate)
 library(RColorBrewer)
 ```
 
@@ -35,9 +36,8 @@ species_csv <- "species.csv"
 
 sites_data <- read_csv(file.path(path_raw, sites_csv))
 
-snowcover_data <- read_csv(file.path(path_raw, snowcover_csv))
 
-nests_data <- read_csv(file.path(path_raw, nests_csv))
+
 
 eggs_data <- read_csv(file.path(path_raw, eggs_csv))
 
@@ -49,41 +49,118 @@ species_data <- read_csv(file.path(path_raw, species_csv))
 
 ## Summarize the nests table
 
+Read the nest data in
+
 ```{r}
-nests_sum <- nests_data %>%
-  group_by(Site, Year, Species) %>%
+nests_data <- read_csv(file.path(path_raw, nests_csv))
+glimpse(nests_data)
+```
+
+Yeah! `Date_found` is already in date format!
+
+
+```{r}
+nests_month <- nests_data %>%
+  mutate(Month = month(Date_found)) %>%
+  group_by(Species, Site, Year, Month) %>%
   summarize(n_nest = n())
 ```
 
 ## Summarize the snow cover table
 
+Read the snow cover data in
+
+```{r}
+snowcover_data <- read_csv(file.path(path_raw, snowcover_csv))
+```
+
+
+First we need to transform the date in date format and compute the monthly aggregate
+
+```{r}
+snowcover_data_fixed <- snowcover_data %>%
+  mutate(snow_days = ifelse(Snow_cover > 10, 1, 0),
+         Date2 = as_date(Date))
+```
+
+We have 72 errors. Let's have a look at the date which failed
+
+```{r}
+snowcover_data_fixed %>% 
+  filter(is.na(Date2)) %>% 
+  View()
+```
+
+
+It is because 2 days were entered `8&9 june 06`, but we know if was in June, so let's add this
+
+```{r}
+snowcover_data_fixed <- snowcover_data_fixed %>%
+  mutate(Date2 = ifelse(is.na(Date2),  dmy("08/06/06"), Date2))
+
+snowcover_data_fixed
+```
+
+Mmm the Dates are not what we were expecting... It generally means there are different date types. Let's start by fixing the problematic dates before transforming it to the date format.
+
+```{r}
+snowcover_data_fixed <- snowcover_data %>%
+  mutate(Date = ifelse(Date == "8&9 june 06", "8 june 06", Date),
+         Date2 = dmy(Date))
+```
+
+
+Now lets compute the monthly statistics
+
 ```{r}
 # adding the snow days with a threshold at 10%
-snowcover_data <- snowcover_data %>%
-  mutate(snow_days = ifelse(Snow_cover > 10, 1, 0))
-
-
-snow_sum <- snowcover_data %>%
-  group_by(Site, Year) %>%
-  summarise(cum_snow_days = sum(snow_days, na.rm=TRUE))
+snowcover_month <- snowcover_data_fixed %>%
+  mutate(snow_days = ifelse(Snow_cover > 10, 1, 0), 
+         Month = month(Date2)) %>%
+  group_by(Site, Year, Month) %>%
+  summarise(cum_snow_days = sum(snow_days, na.rm=TRUE),
+            avg_snow_cover = mean(Snow_cover, na.rm=TRUE)) %>%
+  ungroup()
 ```
 
  
 ## Join the two
 
 ```{r}
-nest_snow <- nests_sum %>%
-  inner_join(snow_sum, join_by(Site, Year))
+nests_snow_month <- nests_month %>%
+  inner_join(snowcover_month, join_by(Site, Year, Month))
 
-names(nest_snow)
+names(nests_snow)
+```
+
+Well in the end we did not have much information by months (mainly 2 months per year focused on June and July), so let's aggregate by year instead:
+
+```{r}
+nests_snow_year <- nests_snow_month %>%
+  group_by(Species, Site, Year) %>%
+  summarise(cum_snow_days = sum(cum_snow_days, na.rm=TRUE),
+            avg_snow_cover = mean(avg_snow_cover, na.rm=TRUE),
+            n_nest = sum(n_nest, na.rm=TRUE)
+            )
+```
+
+
+```{r}
+ggplot(nests_snow_year, aes(x=cum_snow_days, y=n_nest , color=Species)) + 
+  geom_point() +
+  scale_colour_brewer(palette = "Set3") +
+  ggtitle("Number of eggs vs cummulative snow days") #+
+  # facet_wrap(vars(Year), scales = "free")
 ```
 
 ```{r}
-ggplot(nest_snow, aes(x=cum_snow_days, y=n_nest , color=Species)) + 
+ggplot(nests_snow_year, aes(x=avg_snow_cover, y=n_nest , color=Species)) + 
   geom_point() +
-  scale_colour_brewer(palette = "Set3") +
-  facet_wrap(vars(Site), scales = "free")
+  scale_colour_brewer(palette = "Set3")+ 
+  ggtitle("Number of eggs vs avg snow cover")#+
+  # facet_wrap(vars(Year), scales = "free")
 ```
+
 
 ```{r}
 lemming_sum <- lemmings_data %>%
@@ -91,7 +168,7 @@ lemming_sum <- lemmings_data %>%
   summarize(n_lemmings = n())
 ```
 
-
+try by species of bird vs lemming
 
 ```{r}
 nest_lemm <- nests_sum %>%
