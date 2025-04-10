@@ -31,7 +31,60 @@ lemmings_csv <- "ASDN_Daily_pred_lemm.csv"
 ```
 
 
-## Question 1: Does the snow amount & timing impact the number of eggs? Is it species dependant?
+## Question 1: Which shorebird species makes the most eggs?
+
+### Import the data
+
+```{r}
+sites_data <- read_csv(here(path_raw, sites_csv))
+
+eggs_data <- read_csv(here(path_raw, eggs_csv))
+
+species_data <- read_csv(here(path_raw, species_csv))
+```
+
+
+Let's compute the number of eggs per nest. The column `Egg-num` seems to be a good candidate to estimate the number of eggs per nest:
+
+```{r}
+eggs_sum <- eggs_data %>%
+  
+```
+
+Then we can join with the nest table to bring the species information:
+
+```{r}
+nest_species <- eggs_sum %>%
+  
+```
+
+Now we can group by species:
+
+```{r}
+nest_species_avg <- nest_species %>%
+  
+```
+
+Finally it would be better to have the name of the species and not only the 4-letter acronym:
+
+```{r}
+nest_species_avg <- nest_species_avg %>%
+  
+```
+
+Let's put it all together:
+
+```{r}
+nest_species_avg %>% 
+  select(-Relevance) %>%
+  relocate(avg_egg_numb, .after = last_col()) %>%
+  arrange(desc(avg_egg_numb))
+```
+
+
+
+
+## Question 2: Does the snow amount & timing impact the number of eggs? Is it species dependant?
 
 Since the observations are made a different time, we will aggragate the data by month to have an common denominator in time.
 
@@ -142,54 +195,4 @@ ggplot(nests_snow_year, aes(x=avg_snow_cover, y=n_nest , color=Species)) +
 
 What do you think is the answer to our question? 
 
-
-## Question 2: Which shorebird species makes the most eggs?
-
-### Import the data
-
-```{r}
-sites_data <- read_csv(here(path_raw, sites_csv))
-
-eggs_data <- read_csv(here(path_raw, eggs_csv))
-
-species_data <- read_csv(here(path_raw, species_csv))
-```
-
-
-Let's compute the number of eggs per nest. The column `Egg-num` seems to be a good candidate to estimate the number of eggs per nest:
-
-```{r}
-eggs_sum <- eggs_data %>%
-  
-```
-
-Then we can join with the nest table to bring the species information:
-
-```{r}
-nest_species <- eggs_sum %>%
-  
-```
-
-Now we can group by species:
-
-```{r}
-nest_species_avg <- nest_species %>%
-  
-```
-
-Finally it would be better to have the name of the species and not only the 4-letter acronym:
-
-```{r}
-nest_species_avg <- nest_species_avg %>%
-  
-```
-
-Let's put it all together:
-
-```{r}
-nest_species_avg %>% 
-  select(-Relevance) %>%
-  relocate(avg_egg_numb, .after = last_col()) %>%
-  arrange(desc(avg_egg_numb))
-```
 
