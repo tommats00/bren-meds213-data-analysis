@@ -49,9 +49,7 @@ Yeah! `Date_found` is already in date format! We can thus directly aggregate the
 
 ```{r}
 nests_month <- nests_data %>%
-  mutate(Month = month(Date_found)) %>%
-  group_by(Species, Site, Year, Month) %>%
-  summarize(n_nest = n())
+  
 ```
 
 ### Summarize the snow cover table
@@ -68,16 +66,14 @@ The Date is stored as a character :/, we thus first we need to transform the dat
 
 ```{r}
 snowcover_data_fixed <- snowcover_data %>%
-  mutate(snow_days = ifelse(Snow_cover > 10, 1, 0),
-         Date2 = as_date(Date))
+  
 ```
 
 We have 72 errors. Let's have a look at the date which failed:
 
 ```{r}
 snowcover_data_fixed %>% 
-  filter(is.na(Date2)) %>% 
-  View()
+
 ```
 
 
@@ -85,17 +81,14 @@ It is because 2 days were entered as one value `8&9 june 06`, it is not in the e
 
 ```{r}
 snowcover_data_fixed <- snowcover_data_fixed %>%
-  mutate(Date2 = ifelse(is.na(Date2),  dmy("08/06/06"), Date2))
-
-snowcover_data_fixed
+  
 ```
 
 Mmm the Dates are not what we were expecting... It generally means there are different date types. Let's start by fixing the problematic dates before transforming it to the date format.
 
 ```{r}
-snowcover_data_fixed <- snowcover_data %>%
-  mutate(Date = ifelse(Date == "8&9 june 06", "8 june 06", Date),
-         Date2 = dmy(Date))
+snowcover_data_fixed <- 
+  
 ```
 
 
@@ -110,12 +103,7 @@ Now let's compute the monthly statistics
 ```{r}
 # adding the snow days with a threshold at 10%
 snowcover_month <- snowcover_data_fixed %>%
-  mutate(snow_days = ifelse(Snow_cover > 10, 1, 0), 
-         Month = month(Date2)) %>%
-  group_by(Site, Year, Month) %>%
-  summarise(cum_snow_days = sum(snow_days, na.rm=TRUE),
-            avg_snow_cover = mean(Snow_cover, na.rm=TRUE)) %>%
-  ungroup()
+  
 ```
 
  
@@ -124,22 +112,14 @@ snowcover_month <- snowcover_data_fixed %>%
 Since now we have the months in common, we can use them to join our two datasets:
 
 ```{r}
-nests_snow_month <- nests_month %>%
-  inner_join(snowcover_month, join_by(Site, Year, Month))
-
-names(nests_snow_month)
+nests_snow_month <- 
 ```
 
 Well in the end we did not have much information by months (mainly 2 months per year focused on June and July), so let's aggregate by year instead:
 
 ```{r}
 nests_snow_year <- nests_snow_month %>%
-  group_by(Species, Site, Year) %>%
-  summarise(cum_snow_days = sum(cum_snow_days, na.rm=TRUE),
-            avg_snow_cover = mean(avg_snow_cover, na.rm=TRUE),
-            n_nest = sum(n_nest, na.rm=TRUE)
-            ) %>%
-  ungroup()
+  
 ```
 
 ### Plots
@@ -180,33 +160,28 @@ Let's compute the number of eggs per nest. The column `Egg-num` seems to be a go
 
 ```{r}
 eggs_sum <- eggs_data %>%
-  group_by(Site, Year, Nest_ID) %>%
-  summarize(n_egg = max(Egg_num)) %>%
-  ungroup()
+  
 ```
+
 Then we can join with the nest table to bring the species information:
 
 ```{r}
 nest_species <- eggs_sum %>%
-  left_join(nests_data, join_by(Site, Year, Nest_ID))
+  
 ```
 
 Now we can group by species:
 
 ```{r}
 nest_species_avg <- nest_species %>%
-  group_by(Species) %>%
-  summarise(avg_egg_numb = mean(n_egg))
-
-nest_species_avg %>%
-  arrange(desc(avg_egg_numb))
+  
 ```
 
 Finally it would be better to have the name of the species and not only the 4-letter acronym:
 
 ```{r}
 nest_species_avg <- nest_species_avg %>%
-  left_join(species_data, join_by(Species==Code))
+  
 ```
 
 Let's put it all together:
